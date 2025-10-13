@@ -43,7 +43,7 @@ async def help(ctx):
         description="Here are the available commands:",
         color=discord.Color.blue()
     )
-    embed.add_field(name="`!vlrnews vlr_news`", value="Fetches and displays the latest VLR.gg news article.", inline=False)
+    embed.add_field(name="`!vlrnews news`", value="Fetches and displays the latest VLR.gg news article.", inline=False)
     embed.add_field(name="`!vlrnews set_news_channel [#channel]`", value="Sets the channel for VLR news updates. Defaults to the current channel. (Requires *Manage Channels* permission).", inline=False)
     embed.add_field(name="`!vlrnews setup_reactions <@role> [#channel]`", value="Creates a message for users to react to for news pings. (Requires *Manage Roles* & *Manage Channels* permissions).", inline=False)
     embed.add_field(name="`!vlrnews remove_news_channel`", value="Disables VLR news updates for this server. (Requires *Manage Channels* permission).", inline=False)
@@ -169,7 +169,7 @@ async def remove_news_channel(ctx):
 
 
 @bot.command() 
-async def vlr_news(ctx): #command for news, fetches from VLR API and sends latest article URL in Discord chat.
+async def news(ctx):
     msg = await ctx.send(f"Fetching the latest VLR news article for {ctx.author.mention}...")
     await ctx.typing()
     try:
