@@ -36,20 +36,6 @@ intents.message_content = True  # Enable the message content intent
 
 bot = commands.Bot(command_prefix='!vlrnews ', intents=intents, help_command=None)
 
-# Test Command
-@bot.command()
-async def ping(ctx):
-    await ctx.send(f"Pong! {ctx.author.mention}")
-
-async def _send_json(ctx, data, filename): #temporary function to send JSON data
-    payload = json.dumps(data, indent=2, ensure_ascii=False)
-    if len(payload) > 2000:
-        bio = io.BytesIO(payload.encode('utf-8'))
-        bio.seek(0)
-        await ctx.send(file=discord.File(bio, filename=filename))
-    else:
-        await ctx.send(f"```json\n{payload}\n```")
-
 @bot.command()
 async def help(ctx):
     embed = discord.Embed(
@@ -57,7 +43,6 @@ async def help(ctx):
         description="Here are the available commands:",
         color=discord.Color.blue()
     )
-    embed.add_field(name="`!vlrnews ping`", value="Test command to check if the bot is responsive.", inline=False)
     embed.add_field(name="`!vlrnews vlr_news`", value="Fetches and displays the latest VLR.gg news article.", inline=False)
     embed.add_field(name="`!vlrnews set_news_channel [#channel]`", value="Sets the channel for VLR news updates. Defaults to the current channel. (Requires *Manage Channels* permission).", inline=False)
     embed.add_field(name="`!vlrnews setup_reactions <@role> [#channel]`", value="Creates a message for users to react to for news pings. (Requires *Manage Roles* & *Manage Channels* permissions).", inline=False)
