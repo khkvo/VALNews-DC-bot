@@ -60,6 +60,7 @@ async def help(ctx):
     embed.add_field(name="`!ping`", value="Test command to check if the bot is responsive.", inline=False)
     embed.add_field(name="`!vlr_news`", value="Fetches and displays the latest VLR.gg news article.", inline=False)
     embed.add_field(name="`!set_news_channel [#channel]`", value="Sets the channel for VLR news updates. Defaults to the current channel. (Requires *Manage Channels* permission).", inline=False)
+    embed.add_field(name="`!setup_reactions <@role> [#channel]`", value="Creates a message for users to react to for news pings. (Requires *Manage Roles* & *Manage Channels* permissions).", inline=False)
     embed.add_field(name="`!remove_news_channel`", value="Disables VLR news updates for this server. (Requires *Manage Channels* permission).", inline=False)
     
     if await bot.is_owner(ctx.author):
@@ -98,7 +99,16 @@ async def set_news_channel(ctx, channel: discord.TextChannel = None):
 
     async with config_lock:
         guild_id = str(ctx.guild.id)
-        if news_channels_config.get(guild_id) == channel.id:
+        
+        # Data migration: Check for old config format (int) and upgrade to new format (dict)
+        if guild_id in news_channels_config and isinstance(news_channels_config[guild_id], int):
+            print(f"Migrating old config for guild {guild_id}")
+            old_channel_id = news_channels_config[guild_id]
+            news_channels_config[guild_id] = {"channel_id": old_channel_id}
+        elif guild_id not in news_channels_config:
+            news_channels_config[guild_id] = {}
+
+        if news_channels_config.get(guild_id, {}).get("channel_id") == channel.id:
             await ctx.send(f"⚠️ VLR.gg news is already being posted in {channel.mention}.")
             return
 
@@ -109,49 +119,103 @@ async def set_news_channel(ctx, channel: discord.TextChannel = None):
             await ctx.send(f"❌ I don't have permission to send messages in {channel.mention}. Please check my permissions.")
             return
 
-        news_channels_config[guild_id] = channel.id
+        news_channels_config[guild_id]["channel_id"] = channel.id
         _save_config()
         await ctx.send(f"✅ VLR.gg news will now be posted in {channel.mention}.")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True, manage_channels=True)
+@commands.guild_only()
+async def setup_reactions(ctx, role: discord.Role, channel: discord.TextChannel = None):
+    """Sets up a reaction message to opt-in for news pings."""
+    if channel is None:
+        channel = ctx.channel
+
+    # Check if bot can manage roles and send messages
+    if not ctx.guild.me.guild_permissions.manage_roles:
+        await ctx.send("❌ I need the `Manage Roles` permission to assign roles.")
+        return
+    if not channel.permissions_for(ctx.guild.me).send_messages:
+        await ctx.send(f"❌ I don't have permission to send messages in {channel.mention}.")
+        return
+
+    embed = discord.Embed(
+        title="VLR.gg News Notifications",
+        description=f"React with ✅ to get the {role.mention} role and be notified of new articles.",
+        color=discord.Color.blurple()
+    )
+    reaction_message = await channel.send(embed=embed)
+    await reaction_message.add_reaction("✅")
+
+    async with config_lock:
+        guild_id = str(ctx.guild.id)
+        if guild_id not in news_channels_config:
+            news_channels_config[guild_id] = {}
+        news_channels_config[guild_id]["reaction_role"] = {
+            "message_id": reaction_message.id,
+            "role_id": role.id
+        }
+        _save_config()
+    
+    await ctx.send(f"✅ Reaction role setup complete in {channel.mention}.", delete_after=10)
 
 @bot.command()
 @commands.has_permissions(manage_channels=True)
 @commands.guild_only()
 async def remove_news_channel(ctx):
     """Stops posting VLR news updates in this server."""
-    guild_id = str(ctx.guild.id)
     async with config_lock:
-        if guild_id in news_channels_config:
-            del news_channels_config[guild_id]
+        guild_id = str(ctx.guild.id)
+
+        # Data migration: Check for old config format (int) and upgrade to new format (dict)
+        if guild_id in news_channels_config and isinstance(news_channels_config[guild_id], int):
+            print(f"Migrating old config for guild {guild_id}")
+            old_channel_id = news_channels_config[guild_id]
+            news_channels_config[guild_id] = {"channel_id": old_channel_id}
+
+        guild_config = news_channels_config.get(guild_id, {})
+        if "channel_id" in guild_config:
+            # We only remove the channel, not the reaction role setup
+            del guild_config["channel_id"]
             _save_config()
             await ctx.send("✅ VLR.gg news updates have been disabled for this server.")
         else:
-            await ctx.send("⚠️ VLR.gg news updates are not configured for this server.")
+            await ctx.send("⚠️ A news channel is not configured for this server.")
 
 
 @bot.command() 
 async def vlr_news(ctx): #command for news, fetches from VLR API and sends latest article URL in Discord chat.
-    await ctx.send("Fetching latest VLR news article...")
+    msg = await ctx.send(f"Fetching the latest VLR news article for {ctx.author.mention}...")
     await ctx.typing()
     try:
         data = await vlr.get("news") # fetch news from VLR API
     except Exception as e:
-        await ctx.send(f"Error fetching news: {e}")
+        await msg.edit(content=f"Sorry {ctx.author.mention}, I ran into an error: {e}")
         return
 
     segments = (data or {}).get("data", {}).get("segments", [])
     if not segments:
-        await ctx.send("No news found.")
+        await msg.edit(content=f"Sorry {ctx.author.mention}, I couldn't find any news articles.")
         return
-    latest = segments[0]
-    url = latest.get("url_path", "")
+    latest_article = segments[0]
+    url = latest_article.get("url_path", "")
      
     if url:
-        await ctx.send(url)
+        embed = discord.Embed(
+            title=latest_article.get("title", "Latest VLR.gg Article"),
+            url=url,
+            description=latest_article.get("description", "The latest article from VLR.gg."),
+            color=discord.Color.red()
+        )
+        embed.set_footer(text=f"Author: {latest_article.get('author', 'N/A')} • {latest_article.get('date', '')}")
+        
+        # Edit the original message to include the embed
+        await msg.edit(content=f"Here is the latest article, {ctx.author.mention}:", embed=embed)
     else:
-        await ctx.send("Could not find a URL for the latest news article.")
+        await msg.edit(content=f"Sorry {ctx.author.mention}, I found an article but couldn't get its URL.", embed=None)
 
 
-@tasks.loop(minutes=10) #task to check for new articles every 10 minutes
+@tasks.loop(minutes=60) #task to check for new articles every hour
 async def check_for_new_articles():
     global last_known_article_url
     try:
@@ -175,15 +239,73 @@ async def check_for_new_articles():
             last_known_article_url = new_url # Update last known URL immediately
             
             async with config_lock:
-                # Iterate over a copy of the values to be safe
-                for channel_id in list(news_channels_config.values()):
+                for guild_id, config in news_channels_config.items():
+                    channel_id = config.get("channel_id")
+                    if not channel_id:
+                        continue
+
                     channel = bot.get_channel(channel_id)
                     if channel:
-                        await channel.send(f"**New VLR.gg Article Posted!**\n{new_url}")
+                        # Default to the role_id from the old system for backward compatibility
+                        role_id = config.get("role_id") 
+                        # New system check
+                        if "reaction_role" in config:
+                            role_id = config["reaction_role"].get("role_id")
+
+                        role_mention = ""
+                        if role_id:
+                            # In case the role was deleted, we fetch it safely
+                            role = channel.guild.get_role(role_id)
+                            if role:
+                                role_mention = f"{role.mention}"
+
+                        # Create a nice embed for the announcement
+                        embed = discord.Embed(
+                            title=latest_article.get("title", "New VLR.gg Article"),
+                            url=new_url,
+                            description=latest_article.get("description", "A new article has been posted on VLR.gg."),
+                            color=discord.Color.red() # A color that fits the Valorant theme
+                        )
+                        embed.set_footer(text=f"Author: {latest_article.get('author', 'N/A')} • {latest_article.get('date', '')}")
+
+                        # Send the role mention outside the embed for a clean ping
+                        await channel.send(content=role_mention, embed=embed)
 
     except Exception as e:
         print(f"Error during scheduled article check: {e}")
 
+@bot.event
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    # Ignore reactions from the bot itself
+    if payload.user_id == bot.user.id:
+        return
+
+    # Check if the reaction is on a configured message
+    guild_id = str(payload.guild_id)
+    config = news_channels_config.get(guild_id, {}).get("reaction_role")
+    if not config or payload.message_id != config.get("message_id"):
+        return
+
+    # Check if the emoji is correct
+    if str(payload.emoji) == "✅":
+        guild = bot.get_guild(payload.guild_id)
+        role = guild.get_role(config.get("role_id"))
+        if role and payload.member:
+            await payload.member.add_roles(role, reason="Opted in for VLR news")
+
+@bot.event
+async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
+    guild_id = str(payload.guild_id)
+    config = news_channels_config.get(guild_id, {}).get("reaction_role")
+    if not config or payload.message_id != config.get("message_id"):
+        return
+
+    if str(payload.emoji) == "✅":
+        guild = bot.get_guild(payload.guild_id)
+        member = guild.get_member(payload.user_id)
+        role = guild.get_role(config.get("role_id"))
+        if role and member:
+            await member.remove_roles(role, reason="Opted out of VLR news")
 
 @bot.event
 async def on_ready():
