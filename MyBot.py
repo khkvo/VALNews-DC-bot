@@ -27,14 +27,14 @@ def load_config():
             news_channels_config = json.load(f)
 
 def _save_config():
-    """Atomically saves the current configuration to the JSON file."""
+    """Saves the current configuration to the JSON file."""
     with open(CONFIG_FILE, 'w') as f:
         json.dump(news_channels_config, f, indent=4)
 
 intents = discord.Intents.default()
 intents.message_content = True  # Enable the message content intent
 
-bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+bot = commands.Bot(command_prefix='!vlrnews ', intents=intents, help_command=None)
 
 # Test Command
 @bot.command()
@@ -57,14 +57,14 @@ async def help(ctx):
         description="Here are the available commands:",
         color=discord.Color.blue()
     )
-    embed.add_field(name="`!ping`", value="Test command to check if the bot is responsive.", inline=False)
-    embed.add_field(name="`!vlr_news`", value="Fetches and displays the latest VLR.gg news article.", inline=False)
-    embed.add_field(name="`!set_news_channel [#channel]`", value="Sets the channel for VLR news updates. Defaults to the current channel. (Requires *Manage Channels* permission).", inline=False)
-    embed.add_field(name="`!setup_reactions <@role> [#channel]`", value="Creates a message for users to react to for news pings. (Requires *Manage Roles* & *Manage Channels* permissions).", inline=False)
-    embed.add_field(name="`!remove_news_channel`", value="Disables VLR news updates for this server. (Requires *Manage Channels* permission).", inline=False)
+    embed.add_field(name="`!vlrnews ping`", value="Test command to check if the bot is responsive.", inline=False)
+    embed.add_field(name="`!vlrnews vlr_news`", value="Fetches and displays the latest VLR.gg news article.", inline=False)
+    embed.add_field(name="`!vlrnews set_news_channel [#channel]`", value="Sets the channel for VLR news updates. Defaults to the current channel. (Requires *Manage Channels* permission).", inline=False)
+    embed.add_field(name="`!vlrnews setup_reactions <@role> [#channel]`", value="Creates a message for users to react to for news pings. (Requires *Manage Roles* & *Manage Channels* permissions).", inline=False)
+    embed.add_field(name="`!vlrnews remove_news_channel`", value="Disables VLR news updates for this server. (Requires *Manage Channels* permission).", inline=False)
     
     if await bot.is_owner(ctx.author):
-        embed.add_field(name="Owner Commands", value="`!shutdown`, `!restart`", inline=False)
+        embed.add_field(name="Owner Commands", value="`!vlrnews shutdown`, `!vlrnews restart`", inline=False)
 
     await ctx.send(embed=embed)
 
