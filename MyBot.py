@@ -200,7 +200,7 @@ async def news(ctx):
         await msg.edit(content=f"Sorry {ctx.author.mention}, I found an article but couldn't get its URL.", embed=None)
 
 
-@tasks.loop(minutes=60) #task to check for new articles every hour
+@tasks.loop(minutes=15) #task to check for new articles every hour
 async def check_for_new_articles():
     global last_known_article_url
     try:
