@@ -1,4 +1,4 @@
- #VLR.gg News Discord Bot
+# VLR.gg News Discord Bot
 
 A simple and efficient Discord bot that fetches the latest news articles from [VLR.gg](https://www.vlr.gg/) and posts them to a designated channel in your Discord server. It includes features for automatic updates, manual fetching, and reaction roles for notifications.
 
