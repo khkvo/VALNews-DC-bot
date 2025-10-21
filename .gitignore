@@ -1,2 +1,14 @@
-# Enviroments
+# Environment variables
 .env
+
+# Runtime configuration
+config.json
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+*.venv/
+.venv/
