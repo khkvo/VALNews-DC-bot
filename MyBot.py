@@ -63,16 +63,16 @@ async def shutdown(ctx):
         pass
     sys.exit()
 
-@bot.command()
-@commands.is_owner()
-async def restart(ctx):
-    await ctx.send("Restarting bot...")
-    try:
-        await vlr.close()
-    except Exception:
-        pass
-    await bot.close()
-    os.execv(sys.executable, ['python'] + sys.argv)
+# @bot.command() Disabled for safety reasons
+# @commands.is_owner()
+# async def restart(ctx):
+#     await ctx.send("Restarting bot...")
+#     try:
+#         await vlr.close()
+#     except Exception:
+#         pass
+#     await bot.close()
+#     os.execv(sys.executable, ['python'] + sys.argv)
 
 @bot.command()
 @commands.has_permissions(manage_channels=True)
